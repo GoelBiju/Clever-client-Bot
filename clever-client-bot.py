@@ -6,12 +6,13 @@
 # Developed by GoelBiju (2016)
 # https://github.com/GoelBiju/
 
-# Version: 0.0.1
+# Version: 0.0.2
 
 import requests
+import hashlib  # To generate a hash we use hashlib MD5 checksum.
 import time
 import string
-import hashlib  # To generate MD5 checksum.
+
 from requests.compat import urlencode
 from urllib import unquote
 
@@ -19,7 +20,7 @@ DEFAULT_HEADER = {
     'Host': 'www.cleverbot.com',
     'Proxy-Connection': 'keep-alive',
     'Origin': 'http://www.cleverbot.com',
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 ' +
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 ' + 
                   '(KHTML, like Gecko) Chrome/51.0.2704.103 Safari/537.36',
     'Content-Type': 'text/plain;charset=UTF-8',
     'Accept': '*/*',
@@ -42,8 +43,8 @@ class CleverBot:
         Initialise the essential variables.
 
         NOTE: Several variables make use of unicode instead of a default string, this is simply
-              to conform with most encodings whereas using a string or string conversion may result
-              in encoding/decoding errors.
+              to conform with most encodings whereas using a string or string conversion may 
+              result in encoding/decoding errors.
         """
 
         # To manually enable/disable any further conversations with (requests to) CleverBot.
@@ -51,14 +52,14 @@ class CleverBot:
 
         # Our CleverBot HTTP session.
         self.cleverbot_session = requests.Session()
-        print("Initiated CleverBot HTTP Session.")
+        print('Initiated CleverBot HTTP Session.')
         
         # Keep a list of the number of POST requests we make, along with the conversation
         # details which were made to it.
         self.post_log = []
 
         # Time variables.
-        self.init_time = time.time()
+        self.time_diff = None
         self.timeout = 20
         
         # Set CleverBot reply language.
@@ -68,10 +69,8 @@ class CleverBot:
         self.base_url = 'http://www.cleverbot.com/'
         self.full_url = 'http://www.cleverbot.com/webservicemin?uc=255&out=&in=' + \
                         '&bot=c&cbsid=&xai=&ns=&al=&dl=en&flag=&user=&mode=1&alt=0&reac=&t='
-                        
-        #self.post_suffix = 'webservicemin?uc=255'
 
-        # Test the MD5checksum; the VText and sessionid form data is not asked for on the initial request.
+        # Test the MD5checksum; the "VText" and "sessionid" form data is not asked for on the initial request.
         self.start_form_data = {
             'stimulus': u'',
             'cb_settings_scripting': u'no',
@@ -80,6 +79,8 @@ class CleverBot:
             'icognocheck': u''
         }
 
+
+        # TODO: We may not need this at all.
         # WebForms code queries.
         # self.webforms_codes = {
         #     'output_code': '&out=',
@@ -99,15 +100,14 @@ class CleverBot:
         #     'time_code': '&t='
         # }
 
-        # Set essential variables.
-        self.input = u''
 
         # The essential WebForms query variables.
+        self.input = ''
         self.output = ''
         self.bot = 'c'
         self.conversation_id = None
         self.xai = None
-        self.ns = 1
+        self.ns = 0
         self.al = ''
         self.dl = manual_language
         self.flag = ''
@@ -116,7 +116,7 @@ class CleverBot:
         self.alt = 0
         self.reac = ''
         self.emo = ''
-        self.t = 0  # time between each request, as an integer
+        self.t = None
 
         # Initiate connection.
         self.connect()
@@ -147,33 +147,78 @@ class CleverBot:
             >>> print token
         """
 
-        print("Payload data:", payload_data)
+        print('Payload data:', payload_data)
         # Only characters 10 to 36 should be used to produce the token; as stated by folz/cleverbot.py
         digest_encoded = payload_data[9:35]
         token = hashlib.md5(digest_encoded).hexdigest()
-        print("Token:", token)
+        print('Token:', token)
         return token
 
     def generate_post_url(self):
         """
-        Generates the POST url for the final POST data.
-        :return: The POST url generated.
+        Generates the POST url for the next POST query using the default POST url and returns 
+        the new url.
+        
+        NOTE: The only WebForms queries that change so far are "out", "in", "ns" & "t".
+              The constants "cbsid", "dl", "bot", "xai", "mode" and "alt" still needs to be placed in.
+        :return: str the POST url generated.
         """
-        pass
+        
+        # Retrieve full URL for the POST request to alter to our requirements.
+        post_url = self.full_url
+        
+        # Set the input from the user.
+        post_url.replace('&in=', '&in=' + self.input)
+        
+        # Set the output reply from CleverBot in the last POST request.
+        if len(self.output) is not 0:
+            post_url.replace('&out=', '&out=' + self.output)
+        
+        # Set the number of requests we have made to CleverBot.
+        if len(self.post_log) is not 0:
+            self.ns = len(self.post_log)
+            post_url.replace('&ns=', '&ns=' + str(self.ns))
+            
+        # Set the time difference between the last POST request sent and this one being prepared.
+        if self.time_diff is not None:
+            self.t = 0
+            post_url.replace('&t=', '&t=' + str(self.t))
+            
+        # Set the language to use in the POST url.
+        post_url.replace('&dl=', '&dl=' + self.dl)
+        # Set the conversation ID.
+        if self.conversation_id is not None:
+            post_url.replace('&cbsid=', '&cbsid=' + self.conversation_id)
+        # Set the conversation code.
+        post_url.replace('&xai=', '&xai=' + str(self.xai))
+        # Set the bot.
+        post_url.replace('&bot=', '&bot=' + self.bot)
+        # Set the mode.
+        post_url.replace('&mode=', '&mode=' + str(self.mode))
+        # Set the alt.
+        post_url.replace('&alt=', '&alt=' + str(self.alt))
+        
+        print('Generated POST URL:', post_url) 
+        return post_url
+        
 
-    def generate_form_data(self, normal_form_data):
+    def generate_form_data(self):
         """
         Takes current POST form data and sets data to be sent off as url encoded.
         NOTE: All data to be sent must be placed into the normal form data before an authentication token is
               generated, otherwise a valid token will not be sent over (due to the fact that we would be working
               with two different copies of POST form data).
 
-        :param normal_form_data: dict the form data to be url encoded with the correct parameters.
         :return: The formatted POST form data.
         """
+    
+        # Retreive the normal form data structure.
+        normal_form_data = self.start_form_data
 
         # Handle user's input.
         normal_form_data['stimulus'] = u'' + self.input
+        
+        # Handle conversation log, "VText" is the placeholder for this.
 
         # Handle the authentication token.
         authentication_token = self.client_authentication(urlencode(normal_form_data))
@@ -182,9 +227,9 @@ class CleverBot:
         
         # Handle the sessionid data entry.
         # NOTE: This is not required on the initial POST request.
-        #if len(self.post_log) is not 0:
-        #    normal_form_data['sessionid'] = self.conversation_id
-        #    print('Set seesionid token')
+        if len(self.post_log) is not 0:
+            normal_form_data['sessionid'] = self.conversation_id
+            print('Set "sessionid" token')
 
         # Returns url encoded POST form data.
         normal_form_data = urlencode(normal_form_data)
@@ -204,10 +249,11 @@ class CleverBot:
             
             # if test_server:
             #    self.test_response()
+            
             print('Ready to begin conversation.')
             
         else:
-            print("Server did not respond with an 'OK' (status code %s)" % test_server.status_code)
+            print('Server did not respond with an \'OK\' (status code %s)' % test_server.status_code)
             self.cleverbot_on = False
 
     # def test_response(self):
@@ -248,27 +294,29 @@ class CleverBot:
         """
 
         if self.cleverbot_on:
+            
             print('Conversing with CleverBot.')
             print('You:', user_input)
             self.input = user_input
-            form_data = self.start_form_data
             print('Generating form data.')
-            post_data = self.generate_form_data(form_data)
+            post_data = self.generate_form_data()
             print('POST form data was generated.')
-            #post_url = self.base_url + self.post_suffix
+            post_url = self.generate_post_url()
             print('Sending POST request.')
-            post_response = self.cleverbot_session.request(method='POST', url=self.full_url, data=post_data,
+            post_response = self.cleverbot_session.request(method='POST', url=post_url, data=post_data,
                                                            headers=DEFAULT_HEADER, timeout=self.timeout)
+                                                           
             if post_response.status_code is requests.codes.ok:
                 print('Response received successfully.')
-                print('POST response headers:', post_response.headers)
+                
+                # print('POST response headers:', post_response.headers)
                 # Make sure we decode the response we received properly and return it to the user.
                 self.conversation_id = post_response.headers['CBCONVID']
                 self.output = post_response.headers['CBOUTPUT']
                 self.post_log.append([len(self.post_log), self.input, self.output])
-                print self.post_log
+            
                 return unquote(self.output)
-                # self.read_response(post_response)
+                # return self.read_response(post_response)
             else:
                 print('An error may have occured in the POST request.')
                 post_response.raise_for_status()
@@ -312,9 +360,9 @@ class CleverBot:
 
 # Debugging:
 # Test CleverBot:
-# cb_session = CleverBot()
+cb_session = CleverBot()
 
-# while True:
-#     usr = raw_input("Enter in statement/question: ")
-#     response = cb_session.converse(usr)
-#     print("CleverBot response:", response)
+while True:
+     usr = raw_input('Enter in statement/question: ')
+     response = cb_session.converse(usr)
+     print("CleverBot response:", response)
