@@ -6,15 +6,20 @@
 # Developed by GoelBiju (2016)
 # https://github.com/GoelBiju/
 
-# Version: 0.0.2
+# Version: 0.0.3
 
 import requests
+import re
 import hashlib  # To generate a hash we use hashlib MD5 checksum.
 import time
 import string
 
+# TODO: Implement logging.
+# import logging
+
 from requests.compat import urlencode
 from urllib import unquote
+from urllib import quote_plus
 
 DEFAULT_HEADER = {
     'Host': 'www.cleverbot.com',
@@ -59,7 +64,7 @@ class CleverBot:
         self.post_log = []
 
         # Time variables.
-        self.time_diff = None
+        self.time_post = 0
         self.timeout = 20
         
         # Set CleverBot reply language.
@@ -68,37 +73,16 @@ class CleverBot:
 
         self.base_url = 'http://www.cleverbot.com/'
         self.full_url = 'http://www.cleverbot.com/webservicemin?uc=255&out=&in=' + \
-                        '&bot=c&cbsid=&xai=&ns=&al=&dl=en&flag=&user=&mode=1&alt=0&reac=&t='
+                        '&bot=&cbsid=&xai=&ns=&al=&dl=&flag=&user=&mode=&alt=&reac=&t='
 
         # Test the MD5checksum; the "VText" and "sessionid" form data is not asked for on the initial request.
         self.start_form_data = {
-            'stimulus': u'',
-            'cb_settings_scripting': u'no',
-            'is_learning': 1,
-            'incognoid': u'wsf',
-            'icognocheck': u''
+            'stimulus': '',
+            'cb_settings_scripting': 'no',
+            'islearning': '1',
+            'incognoid': 'wsf',
+            'icognocheck': ''
         }
-
-
-        # TODO: We may not need this at all.
-        # WebForms code queries.
-        # self.webforms_codes = {
-        #     'output_code': '&out=',
-        #     'input_code': '&in=',
-        #     'bot_code': '&bot=c',
-        #     'session_code': '&cbsid=',
-        #     'cookie_code': '&xai=',
-        #     'ns_code': '&ns=1',
-        #     'al_code': '&al=',
-        #     'dl_code': '&dl=en',
-        #     'flag_code': '&flag=',
-        #     'user_code': '&user=',
-        #     'mode_code': '&mode=1',
-        #     'alt_code': '&alt=0',
-        #     'reac_code': '&reac=',
-        #     'emo_code': '&emo=',
-        #     'time_code': '&t='
-        # }
 
 
         # The essential WebForms query variables.
@@ -106,14 +90,14 @@ class CleverBot:
         self.output = ''
         self.bot = 'c'
         self.conversation_id = None
-        self.xai = None
+        self.xai = ''
         self.ns = 0
         self.al = ''
         self.dl = manual_language
         self.flag = ''
         self.user = ''
-        self.mode = 1
-        self.alt = 0
+        self.mode = '1'
+        self.alt = '0'
         self.reac = ''
         self.emo = ''
         self.t = None
@@ -147,11 +131,11 @@ class CleverBot:
             >>> print token
         """
 
-        print('Payload data:', payload_data)
+        # print('Payload data:', payload_data)
         # Only characters 10 to 36 should be used to produce the token; as stated by folz/cleverbot.py
         digest_encoded = payload_data[9:35]
         token = hashlib.md5(digest_encoded).hexdigest()
-        print('Token:', token)
+        # print('Token:', token)
         return token
 
     def generate_post_url(self):
@@ -168,37 +152,45 @@ class CleverBot:
         post_url = self.full_url
         
         # Set the input from the user.
-        post_url.replace('&in=', '&in=' + self.input)
+        post_url = post_url.replace('&in=', '&in=' + str(self.input))
         
         # Set the output reply from CleverBot in the last POST request.
         if len(self.output) is not 0:
-            post_url.replace('&out=', '&out=' + self.output)
+            post_url = post_url.replace('&out=', '&out=' + str(self.output))
         
+        # TODO: Make sure this number is accurate.
         # Set the number of requests we have made to CleverBot.
-        if len(self.post_log) is not 0:
-            self.ns = len(self.post_log)
-            post_url.replace('&ns=', '&ns=' + str(self.ns))
+        if self.ns is not 0:
+            post_url = post_url.replace('&ns=', '&ns=' + str(self.ns))
             
+        # TODO: Implement the time difference between POST requests.
         # Set the time difference between the last POST request sent and this one being prepared.
-        if self.time_diff is not None:
-            self.t = 0
-            post_url.replace('&t=', '&t=' + str(self.t))
+        if self.time_post is not 0:
             
+            self.t = int(round(time.time() * 1000)) - self.time_post
+            # print "Posted time and current time difference:", self.t
+            post_url = post_url.replace('&t=', '&t=' + str(self.t))
+        
         # Set the language to use in the POST url.
-        post_url.replace('&dl=', '&dl=' + self.dl)
+        post_url = post_url.replace('&dl=', '&dl=' + str(self.dl))
+        
         # Set the conversation ID.
         if self.conversation_id is not None:
-            post_url.replace('&cbsid=', '&cbsid=' + self.conversation_id)
+            post_url = post_url.replace('&cbsid=', '&cbsid=' + str(self.conversation_id))
+            
         # Set the conversation code.
-        post_url.replace('&xai=', '&xai=' + str(self.xai))
-        # Set the bot.
-        post_url.replace('&bot=', '&bot=' + self.bot)
-        # Set the mode.
-        post_url.replace('&mode=', '&mode=' + str(self.mode))
-        # Set the alt.
-        post_url.replace('&alt=', '&alt=' + str(self.alt))
+        post_url = post_url.replace('&xai=', '&xai=' + str(self.xai))
         
-        print('Generated POST URL:', post_url) 
+        # Set the bot.
+        post_url = post_url.replace('&bot=', '&bot=' + str(self.bot))
+        
+        # Set the mode.
+        post_url = post_url.replace('&mode=', '&mode=' + str(self.mode))
+        
+        # Set the alt.
+        post_url = post_url.replace('&alt=', '&alt=' + str(self.alt))
+        
+        # print('Generated POST URL:', post_url) 
         return post_url
         
 
@@ -216,20 +208,41 @@ class CleverBot:
         normal_form_data = self.start_form_data
 
         # Handle user's input.
-        normal_form_data['stimulus'] = u'' + self.input
+        normal_form_data['stimulus'] = quote_plus(self.input)
         
+        # TODO: Wee need to flip over the replies and increase the numbers.
         # Handle conversation log, "VText" is the placeholder for this.
+        if len(self.post_log) is not 0:
+            # print('POST LOG before vText:', self.post_log)
+            
+            # Generate the reversed POST log.
+            reversed_log = list(reversed(self.post_log))
 
-        # Handle the authentication token.
-        authentication_token = self.client_authentication(urlencode(normal_form_data))
-        print('Generating token.')
-        normal_form_data['icognocheck'] = authentication_token
+            # Record each entry in the list, we start at 2 since 1 is the request 
+            # we have recently inputted.
+            individual_entry = 2
+            for x in range(len(reversed_log)):
+                normal_form_data['stimulus'] = normal_form_data['stimulus'] + '&vText' + str(individual_entry) + '=' + reversed_log[x][1]
+                individual_entry = individual_entry + 1
+                normal_form_data['stimulus'] = normal_form_data['stimulus'] + '&vText' + str(individual_entry) + '=' + reversed_log[x][0]
+                individual_entry = individual_entry + 1
+            
+            print('New Stimulus with vText:', normal_form_data['stimulus'])
         
         # Handle the sessionid data entry.
         # NOTE: This is not required on the initial POST request.
+        # Disabling this allows requests to be sent without replies being in context to the previous replies.
         if len(self.post_log) is not 0:
-            normal_form_data['sessionid'] = self.conversation_id
-            print('Set "sessionid" token')
+             normal_form_data['sessionid'] = self.conversation_id
+            
+        # Handle language settings.
+        if len(self.post_log) is not 0:
+            normal_form_data['cb_settings_language'] = self.dl
+            
+        # Handle the authentication token.
+        authentication_token = self.client_authentication(urlencode(normal_form_data))
+        # print('Generating token.')
+        normal_form_data['icognocheck'] = authentication_token
 
         # Returns url encoded POST form data.
         normal_form_data = urlencode(normal_form_data)
@@ -244,8 +257,8 @@ class CleverBot:
                                                      headers=DEFAULT_HEADER, timeout=self.timeout)
 
         if test_server.status_code is requests.codes.ok:
-            print('Server response:', test_server.status_code, 'With cookies:', test_server.cookies)
-            print('Connection headers', test_server.headers)
+            # print('Server response:', test_server.status_code, 'With cookies:', test_server.cookies)
+            # print('Connection headers', test_server.headers)
             
             # if test_server:
             #    self.test_response()
@@ -289,74 +302,54 @@ class CleverBot:
         NOTES:
         
             NOTE: Urllib unquoting.
-            >>> text = "And%20what%20is%20your%20dog's%20name%3F"
+            >>> text = "And%20what%20is%20your%20dog's%20name"
             >>> print(unquote(text))
         """
 
         if self.cleverbot_on:
             
-            print('Conversing with CleverBot.')
-            print('You:', user_input)
-            self.input = user_input
-            print('Generating form data.')
+            # print('Conversing with CleverBot.')
+            print 'You:', user_input
+            
+            self.input = quote_plus(user_input)
+            
+            # print('Generating form data.')
             post_data = self.generate_form_data()
-            print('POST form data was generated.')
+            # print('POST form data was generated.')
             post_url = self.generate_post_url()
-            print('Sending POST request.')
+            
+            # print('Sending POST request.')
             post_response = self.cleverbot_session.request(method='POST', url=post_url, data=post_data,
                                                            headers=DEFAULT_HEADER, timeout=self.timeout)
+                                       
+            # Handle the POST time.                    
+            self.time_post = int(round(time.time() * 1000))
+            # print "Time posted at:", self.time_post
                                                            
             if post_response.status_code is requests.codes.ok:
-                print('Response received successfully.')
+                # print('Response received successfully.')
                 
                 # print('POST response headers:', post_response.headers)
-                # Make sure we decode the response we received properly and return it to the user.
-                self.conversation_id = post_response.headers['CBCONVID']
-                self.output = post_response.headers['CBOUTPUT']
-                self.post_log.append([len(self.post_log), self.input, self.output])
+                
+                # Make sure we parse/decode the response we received properly and return it to the user.
+                self.conversation_id = post_response.headers['cbconvid']
+                set_cookie = post_response.headers['set-cookie']
+                self.xai = re.search('XAI=(.+?);', set_cookie).group(1)
+                self.output = post_response.headers['cboutput']
+                
+                # Increment the response count.
+                self.ns += 1
+                
+                # Add conversation to the log list.
+                self.post_log.append([self.input, self.output])
             
                 return unquote(self.output)
-                # return self.read_response(post_response)
             else:
                 print('An error may have occured in the POST request.')
                 post_response.raise_for_status()
         else:
             print('Clever-client-bot is unable to reach the CleverBot server.')
             
-    # TODO: Solve the whitespaces/newlines issue without compromising the output.
-    @staticmethod
-    def read_response(response_object):
-        """
-        Reads the raw response returned by the POST request.
-        NOTE: This decodes the whole response taking into account any unicode encoding.
-
-        :param response_object: requests response object.
-        :return: str the response that was decoded.
-        """
-        content = u''
-        all_bytes = []
-        try:
-            for byte in response_object.iter_content(decode_unicode=False):
-                # byte = byte.strip()
-                # print [byte]
-                all_bytes.append(byte)
-                #for char in byte:
-                for char in range(len(all_bytes)):
-                    if type(char) is not int:
-                        char = char.strip()
-                        if len(char) is not 0:
-                            csd = ord(char)
-                            individual = unichr(csd)
-                            content += u'' + individual
-                    
-            # Urllib unquoting.
-            content = unquote(content)
-            return content
-            
-        # We really shouldn't be expecting any Unicode errors, however we shall handle for the eventuality.
-        except UnicodeDecodeError:
-            return None
-
 
 # Debugging:
 # Test CleverBot:
@@ -365,4 +358,4 @@ cb_session = CleverBot()
 while True:
      usr = raw_input('Enter in statement/question: ')
      response = cb_session.converse(usr)
-     print("CleverBot response:", response)
+     print 'CleverBot response:', response
