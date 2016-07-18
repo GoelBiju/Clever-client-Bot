@@ -312,13 +312,14 @@ class CleverBot:
             print('Clever-client-bot is unable to reach the CleverBot server.')
 
 
-# Test CleverBot:
-cb_session = CleverBot()
+if __name__ == "main":
+    # Test CleverBot:
+    cb_session = CleverBot()
 
-while True:
-    usr = raw_input('\nEnter in statement/question: ')
-    response = cb_session.converse(usr)
-    print('CleverBot response: %s' % response)
+    while True:
+        usr = raw_input('\nEnter in statement/question: ')
+        response = cb_session.converse(usr)
+        print('CleverBot response: %s' % response)
 
 # Debugging (token):
 # payload = ''
