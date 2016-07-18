@@ -9,8 +9,8 @@ This library has been developed as a more cut down and simpler version of the or
 Please post any issues in the issues section here on GitHub if you encounter anything abnormal.
 
 Some known issues include:
-    * The connection might receive a 400 BAD REQUEST, time to time,
-    * The data being sent should really be cleared out, rather than piling it (this is a todo),
-    * Needs to be able to log using logging module (another todo).
+   * The connection might receive a 400 BAD REQUEST, time to time,
+   * The data being sent should really be cleared out, rather than piling it (this is a todo),
+   * Needs to be able to log using logging module (another todo).
 
 Author: [GoelBiju](https://github.com/GoelBiju/)
