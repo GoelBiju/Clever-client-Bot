@@ -1,26 +1,62 @@
-#!/usr/bin/env python2
 # -*- coding: utf-8 -*-
+""" Clever-client-Bot (A Python CleverBot Client)
+    _______                               ___            __        ____        __
+  / ____/ /__ _   _____  _____      _____/ (_)__  ____  / /_      / __ )____  / /_
+ / /   / / _ \ | / / _ \/ ___/_____/ ___/ / / _ \/ __ \/ __/_____/ __  / __ \/ __/
+/ /___/ /  __/ |/ /  __/ /  /_____/ /__/ / /  __/ / / / /_/_____/ /_/ / /_/ / /_
+\____/_/\___/|___/\___/_/         \___/_/_/\___/_/ /_/\__/     /_____/\____/\__/
 
-""" Clever-client-Bot (A Python CleverBot Client) """
+"""
 
-# Developed by GoelBiju (2016)
-# https://github.com/GoelBiju/
+# Developed by GoelBiju (2016) https://github.com/GoelBiju/
+# Version: 1.0
 
-# Version: 0.4
+'''
+Author: "I'm sure this conforms to PEP8... Or does it?"
+'''
 
 import requests
 import re
 import hashlib  # To generate a hash we use hashlib MD5 checksum.
 import time
 
-# TODO: Make sure we send the POST variables in the right order.
-# TODO: Make sure the vText equals symbol is not encoded; maybe make the vText first then get the hash from that(?)
-
-# TODO: Implement logging.
-# import logging
-
 from urllib import unquote
 from urllib import quote_plus
+
+# TODO: Make sure we send the POST variables in the right order.
+# TODO: Make sure the vText equals symbol is not encoded; maybe make the vText first then get the hash from that(?)
+# TODO: Implement logging.
+# TODO: We need to flip over the replies and increase the numbers.
+# TODO: Add ChangeLog.
+
+# Debug notes
+# The difference in requests:
+"""
+Website: stimulus=Are%20you%20OK%3F&vText2=Czesc.&vText3=Hi.
+         &sessionid=WXDADF3BM3
+Bot: stimulus=Are%252Byou%252BOK%25253F%26vText2%3DCze%25C5%259B%25C4%2587.%26vText3%3DHi.
+     &sessionid=WXHD9BVD1H
+
+With same website sessionids:
+     Bot token: f18dc646e67c52c42075dbdad2067830
+     Therefore, variances in sessionid does not change the outcome of the payload token.
+
+With same stimulus data from website:
+    Bot token: f18dc646e67c52c42075dbdad2067830
+    We see that there is still no difference even when having the same stimulus.
+
+With the same order:
+    Order: stimulus, cb_settings_language, cb_settings_scripting, sessionid, islearning, icognoid & icognocheck
+    Token: 22d993714e5dba1620050948761c513f
+
+    With same stimulus as well:
+        Token: 11af21b2970b852fe7790ce0f66e688e
+        Here is a match with the same token.
+
+    Therefore we need to have this same order and also we need to have the stimulus first.
+
+    Mainly it is based on the stimulus.
+"""
 
 DEFAULT_HEADER = {
     'Host': 'www.cleverbot.com',
@@ -35,9 +71,6 @@ DEFAULT_HEADER = {
     'Accept-Encoding': 'gzip, deflate',
     'Accept-Language': 'en-GB,en-US;q=0.8,en;q=0.6'
 }
-
-# Test the reply from the server by posting a random sample text.
-# test_server = True
 
 
 class CleverBot:
@@ -57,7 +90,7 @@ class CleverBot:
 
         # Our CleverBot HTTP session.
         self.cleverbot_session = requests.Session()
-        print('Initiated CleverBot HTTP Session.')
+        print('--> Initiated CleverBot HTTP Session.')
 
         # Keep a list of the number of POST requests we make, along with the conversation
         # details which were made to it.
@@ -68,7 +101,7 @@ class CleverBot:
         self.timeout = 20
 
         # Set CleverBot reply language.
-        # NOTE: Set to English, other country codes can be specificed e.g. 'fr' (France).
+        # NOTE: Set to English, other country codes can be specified e.g. 'fr' (France).
         manual_language = 'en'
 
         self.base_url = 'http://www.cleverbot.com/'
@@ -121,7 +154,7 @@ class CleverBot:
         the new url.
 
         NOTE: The only WebForms queries that change so far are "out", "in", "ns" & "t".
-              The constants "cbsid", "dl", "bot", "xai", "mode" and "alt" still needs to be placed in.
+              The constants "cbsid", "dl", "bot", "xai", "mode", "alt" and "sou" still need to be placed in.
         :return: str the POST url generated.
         """
         # Retrieve full URL for the POST request to alter to our requirements.
@@ -142,9 +175,8 @@ class CleverBot:
         # TODO: Implement the time difference between POST requests.
         # Set the time difference between the last POST request sent and this one being prepared.
         if self.time_post is not 0:
-
+            # Calculate the new time difference and place it into the post URL.
             self.t = int(round(time.time() * 1000)) - self.time_post
-            # print "Posted time and current time difference:", self.t
             post_url = post_url.replace('&t=', '&t=' + str(self.t))
 
         # Set the language to use in the POST url.
@@ -169,7 +201,7 @@ class CleverBot:
         # Set the sou.
         post_url = post_url.replace('&sou=', '&sou=' + str(self.sou))
 
-        print('Generated POST URL: %s' % post_url)
+        # print('Generated POST URL: %s' % post_url)
         return post_url
 
     def generate_form_data(self):
@@ -187,7 +219,6 @@ class CleverBot:
         # Place the initial stimulus as the user's input (URL-encoded).
         raw_stimulus = quote_plus(self.input)
 
-        # TODO: Wee need to flip over the replies and increase the numbers.
         # Handle conversation log, "VText" is the placeholder for this.
         if len(self.post_log) is not 0:
             # Generate the reversed POST log.
@@ -200,11 +231,11 @@ class CleverBot:
                 individual_entry += 1
                 raw_stimulus += '&vText%s=%s' % (str(individual_entry), reversed_log[x][0])
                 individual_entry += 1
-            print('New Stimulus with vText:', raw_stimulus)
+            # print('New Stimulus with vText: %s' % raw_stimulus)
 
-        # Handle the sessionid data entry.
-        # NOTE: This is not required on the initial POST request.
-        # Disabling this allows requests to be sent without replies being in context to the previous replies.
+        # Handle the "sessionid" data entry.
+        # NOTE: This is not required on the initial POST request. Disabling this allows requests to be sent without
+        # replies being in context to the previous inputs, this may give you randomised answers from the server.
         if len(self.post_log) is not 0:
             normal_form_data = normal_form_data.replace('&sessionid=', '&sessionid=' + self.conversation_id)
 
@@ -220,23 +251,22 @@ class CleverBot:
         normal_form_data = normal_form_data.replace('&icognocheck=', '&icognocheck=' + authentication_token)
 
         # Returns url encoded POST form data.
-        print('POST form data generated:', normal_form_data)
+        # print('POST form data generated: %s' % normal_form_data)
         return normal_form_data
 
     def connect(self):
         """ Establish that a connection can be made with the server. """
-
         # Initialise a connection with CleverBot.
-        print('Connecting to CleverBot.')
+        print('--> Connecting to CleverBot.\n')
         test_server = self.cleverbot_session.request(method='GET', url=self.base_url,
                                                      headers=DEFAULT_HEADER, timeout=self.timeout)
 
         # If we received an "OK" (200) status code, then proceed to begin a conversation.
         if test_server.status_code is requests.codes.ok:
-            print('Ready to begin conversation.')
+            print('*Ready to begin conversation.*')
         else:
             # Otherwise, set CleverBot to be disabled.
-            print('Server did not respond with an \'OK\' (status code %s)' % test_server.status_code)
+            print('*Server did not respond with an \'OK\' (status code %s)*' % test_server.status_code)
             self.cleverbot_on = False
 
     def converse(self, user_input):
@@ -244,9 +274,8 @@ class CleverBot:
         Takes user's input and maintains a continuous conversation with CleverBot.
         :param user_input: str the users statement/question to query with CleverBot.
         """
-
         if self.cleverbot_on:
-            print 'You:', user_input
+            print('You: %s' % user_input)
             # URL-encode user input.
             self.input = quote_plus(user_input)
 
@@ -283,45 +312,16 @@ class CleverBot:
             print('Clever-client-bot is unable to reach the CleverBot server.')
 
 
-# Debugging:
 # Test CleverBot:
 cb_session = CleverBot()
 
 while True:
-    usr = raw_input('Enter in statement/question: ')
+    usr = raw_input('\nEnter in statement/question: ')
     response = cb_session.converse(usr)
-    print 'CleverBot response:', response
+    print('CleverBot response: %s' % response)
 
+# Debugging (token):
 # payload = ''
-# token = CleverBot.client_authentication(payload)
-# print token
-
-# The difference in requests:
-"""
-Website: stimulus=Are%20you%20OK%3F&vText2=Czesc.&vText3=Hi.
-         &sessionid=WXDADF3BM3
-Bot: stimulus=Are%252Byou%252BOK%25253F%26vText2%3DCze%25C5%259B%25C4%2587.%26vText3%3DHi.
-     &sessionid=WXHD9BVD1H
-
-With same website sessionids:
-     Bot token: f18dc646e67c52c42075dbdad2067830
-     Therefore, variances in sessionid does not change the outcome of the payload token.
-
-With same stimulus data from website:
-    Bot token: f18dc646e67c52c42075dbdad2067830
-    We see that there is still no difference even when having the same stimulus.
-
-With the same order:
-    Order: stimulus, cb_settings_language, cb_settings_scripting, sessionid, islearning, icognoid & icognocheck
-    Token: 22d993714e5dba1620050948761c513f
-
-    With same stimulus as well:
-        Token: 11af21b2970b852fe7790ce0f66e688e
-        Here is a match with the same token.
-
-    Therefore we need to have this same order and also we need to have the stimulus first.
-
-    Mainly it is based on the stimulus.
-"""
-
+# post_token = CleverBot.client_authentication(payload)
+# print(post_token)
 
