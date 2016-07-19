@@ -311,7 +311,7 @@ class CleverBot:
             print('Clever-client-bot is unable to reach the CleverBot server.')
 
 
-if __name__ == 'main':
+if __name__ == '__main__':
     # Test CleverBot:
     cb_session = CleverBot()
 
