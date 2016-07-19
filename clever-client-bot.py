@@ -66,7 +66,6 @@ DEFAULT_HEADER = {
                   '(KHTML, like Gecko) Chrome/51.0.2704.103 Safari/537.36',
     'Content-Type': 'text/plain;charset=UTF-8',
     'Accept': '*/*',
-    'DNT': '1',
     'Referer': 'http://www.cleverbot.com/',
     'Accept-Encoding': 'gzip, deflate',
     'Accept-Language': 'en-GB,en-US;q=0.8,en;q=0.6'
@@ -312,7 +311,7 @@ class CleverBot:
             print('Clever-client-bot is unable to reach the CleverBot server.')
 
 
-if __name__ == "main":
+if __name__ == 'main':
     # Test CleverBot:
     cb_session = CleverBot()
 
