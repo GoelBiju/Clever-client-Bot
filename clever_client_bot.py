@@ -9,25 +9,21 @@
 """
 
 # Developed by GoelBiju (2016) https://github.com/GoelBiju/
-# Version: 1.0
-
-'''
-Author: "I'm sure this conforms to PEP8... Or does it?"
-'''
 
 import requests
 import re
 import hashlib  # To generate a hash we use hashlib MD5 checksum.
 import time
+import logging
 
 from urllib import unquote
 from urllib import quote_plus
 
-# TODO: Make sure we send the POST variables in the right order.
-# TODO: Make sure the vText equals symbol is not encoded; maybe make the vText first then get the hash from that(?)
-# TODO: Implement logging.
-# TODO: We need to flip over the replies and increase the numbers.
 # TODO: Add ChangeLog.
+# NEW: Make sure we send the POST variables in the right order.
+# NEW: Make sure the vText equals symbol is not encoded; maybe make the vText first then get the hash from that.
+# NEW: Implement logging.
+# NEW: We need to flip over the replies and increase the numbers.
 
 # Debug notes
 # The difference in requests:
@@ -57,6 +53,14 @@ With the same order:
 
     Mainly it is based on the stimulus.
 """
+
+__version__ = '1.1.0'
+
+# NOTE: Debugging only works when the script is used within a console and not as an import.
+debugging = False
+debugging_file = 'cleverbot_debug.log'
+console = False
+log = logging.getLogger(__name__)
 
 DEFAULT_HEADER = {
     'Host': 'www.cleverbot.com',
@@ -89,7 +93,8 @@ class CleverBot:
 
         # Our CleverBot HTTP session.
         self.cleverbot_session = requests.Session()
-        print('--> Initiated CleverBot HTTP Session.')
+        if debugging and console:
+            log.info('--> Initiated CleverBot HTTP Session.')
 
         # Keep a list of the number of POST requests we make, along with the conversation
         # details which were made to it.
@@ -145,6 +150,9 @@ class CleverBot:
         # Only characters 10 to 36 should be used to produce the token; as stated by folz/cleverbot.py
         digest_encoded = payload_data[9:35]
         post_token = hashlib.md5(digest_encoded).hexdigest()
+        if debugging and console:
+            log.info('Raw authentication sliced-text: %s' % digest_encoded)
+            log.info('POST token generated: %s' % post_token)
         return post_token
 
     def generate_post_url(self):
@@ -166,12 +174,12 @@ class CleverBot:
         if len(self.output) is not 0:
             post_url = post_url.replace('&out=', '&out=' + str(self.output))
 
-        # TODO: Make sure this number is accurate.
+        # NEW: Make sure this number is accurate.
         # Set the number of requests we have made to CleverBot.
         if self.ns is not 0:
             post_url = post_url.replace('&ns=', '&ns=' + str(self.ns))
 
-        # TODO: Implement the time difference between POST requests.
+        # NEW: Implement the time difference between POST requests.
         # Set the time difference between the last POST request sent and this one being prepared.
         if self.time_post is not 0:
             # Calculate the new time difference and place it into the post URL.
@@ -200,7 +208,8 @@ class CleverBot:
         # Set the sou.
         post_url = post_url.replace('&sou=', '&sou=' + str(self.sou))
 
-        # print('Generated POST URL: %s' % post_url)
+        if debugging and console:
+            log.info('Generated POST URL: %s' % post_url)
         return post_url
 
     def generate_form_data(self):
@@ -230,7 +239,6 @@ class CleverBot:
                 individual_entry += 1
                 raw_stimulus += '&vText%s=%s' % (str(individual_entry), reversed_log[x][0])
                 individual_entry += 1
-            # print('New Stimulus with vText: %s' % raw_stimulus)
 
         # Handle the "sessionid" data entry.
         # NOTE: This is not required on the initial POST request. Disabling this allows requests to be sent without
@@ -250,22 +258,25 @@ class CleverBot:
         normal_form_data = normal_form_data.replace('&icognocheck=', '&icognocheck=' + authentication_token)
 
         # Returns url encoded POST form data.
-        # print('POST form data generated: %s' % normal_form_data)
         return normal_form_data
 
     def connect(self):
         """ Establish that a connection can be made with the server. """
         # Initialise a connection with CleverBot.
-        print('--> Connecting to CleverBot.\n')
+        if debugging and console:
+            log.info('--> Connecting to CleverBot.')
         test_server = self.cleverbot_session.request(method='GET', url=self.base_url,
                                                      headers=DEFAULT_HEADER, timeout=self.timeout)
 
         # If we received an "OK" (200) status code, then proceed to begin a conversation.
         if test_server.status_code is requests.codes.ok:
-            print('*Ready to begin conversation.*')
+            if debugging and console:
+                log.info('*Ready to begin conversation.*')
+            return
         else:
             # Otherwise, set CleverBot to be disabled.
-            print('*Server did not respond with an \'OK\' (status code %s)*' % test_server.status_code)
+            if debugging and console:
+                log.error('*Server did not respond with an \'OK\' (status code %s)*' % test_server.status_code)
             self.cleverbot_on = False
 
     def converse(self, user_input):
@@ -274,7 +285,11 @@ class CleverBot:
         :param user_input: str the users statement/question to query with CleverBot.
         """
         if self.cleverbot_on:
-            print('You: %s' % user_input)
+            # Print user's input and log it if necessary.
+            log_user_input = 'You: %s' % user_input
+            if debugging and console:
+                print(log_user_input)
+                log.info(log_user_input)
             # URL-encode user input.
             self.input = quote_plus(user_input)
 
@@ -302,23 +317,45 @@ class CleverBot:
                 # Add conversation to the log list.
                 self.post_log.append([self.input, self.output])
 
-                # Return the URL-encoding removed output from the server.
-                return unquote(self.output)
+                # Return the URL-encoding removed output from the server (add to the log if necessary).
+                response = unquote(self.output)
+                if debugging and console:
+                    log.info(response)
+                return response
             else:
-                print('An error may have occured in the POST request.')
+                if debugging and console:
+                    log.warning('An error may have occured in the POST request.')
+                    log.error(post_response.headers)
                 post_response.raise_for_status()
         else:
-            print('Clever-client-bot is unable to reach the CleverBot server.')
+            if debugging and console:
+                log.error('Clever-client-bot is unable to reach the CleverBot server.')
 
 
-if __name__ == '__main__':
-    # Test CleverBot:
+def main():
+    global console
+
+    # Initialise CleverBot instance.
     cb_session = CleverBot()
 
+    # Turn on console mode to allow debugging to work, otherwise the instance will function as an import.
+    console = True
+
+    # Start the loop to ask the user for his/her statement/question to send to CleverBot,
+    # and print the response received from the server.
     while True:
         usr = raw_input('\nEnter in statement/question: ')
         response = cb_session.converse(usr)
         print('CleverBot response: %s' % response)
+
+if __name__ == '__main__':
+    if debugging:
+        formatter = '%(asctime)s : %(levelname)s : %(filename)s : %(lineno)d : %(funcName)s() : %(name)s : %(message)s'
+        logging.basicConfig(filename=debugging_file, level=logging.DEBUG, format=formatter)
+        log.info('Starting Clever-client-Bot version: %s' % __version__)
+    else:
+        log.addHandler(logging.NullHandler())
+    main()
 
 # Debugging (token):
 # payload = ''
