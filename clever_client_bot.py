@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
-""" Clever-client-Bot (A Python CleverBot Client)
+
+""" Clever-client-Bot (A Python simple CleverBot Client).
     _______                               ___            __        ____        __
   / ____/ /__ _   _____  _____      _____/ (_)__  ____  / /_      / __ )____  / /_
  / /   / / _ \ | / / _ \/ ___/_____/ ___/ / / _ \/ __ \/ __/_____/ __  / __ \/ __/
@@ -7,26 +8,35 @@
 \____/_/\___/|___/\___/_/         \___/_/_/\___/_/ /_/\__/     /_____/\____/\__/
 
 """
+# Developed by GoelBiju (2016) - https://github.com/GoelBiju/
 
-# Developed by GoelBiju (2016) https://github.com/GoelBiju/
-
-import requests
-import re
-import hashlib  # To generate a hash we use hashlib MD5 checksum.
-import time
+import sys
 import logging
+import requests
+import time
+import hashlib  # We use hashlib to generate the MD5 checksum to be used in request payloads.
+import re
 
-from urllib import unquote
-from urllib import quote_plus
+# Backwards compatibility with Python 3+ and Python 2.
+if sys.version >= '3':
+    # Python 3+.
+    from urllib.parse import unquote
+    from urllib.parse import quote_plus
+    input_type = input
+else:
+    # Python < 3.
+    from urllib import unquote
+    from urllib import quote_plus
+    input_type = raw_input
 
-# TODO: Add ChangeLog.
-# NEW: Make sure we send the POST variables in the right order.
-# NEW: Make sure the vText equals symbol is not encoded; maybe make the vText first then get the hash from that.
-# NEW: Implement logging.
-# NEW: We need to flip over the replies and increase the numbers.
+# TODO: Add ChangeLog and include all changes from the previous version.
+# NEW: Added fallback to Python 3.
+# NEW: Small tweaks to avoid string formatting via percentage symbol everywhere, using .format as well.
+# NEW: The unicode object not being encoded before hashing error has been resolved in Python 3+. We know encode the
+#      digest to utf-8 just before hashing and producing the hex-digest.
 
-# Debug notes
-# The difference in requests:
+# Debug notes:
+#   - the difference in requests:
 """
 Website: stimulus=Are%20you%20OK%3F&vText2=Czesc.&vText3=Hi.
          &sessionid=WXDADF3BM3
@@ -51,13 +61,14 @@ With the same order:
 
     Therefore we need to have this same order and also we need to have the stimulus first.
 
-    Mainly it is based on the stimulus.
+    To put it in a nutshell, whether the response will be accepted by the server is based on the stimulus it
+    receives and parses initially from our request.
 """
 
-__version__ = '1.1.0'
+__version__ = '1.1.1'
 
 # NOTE: Debugging only works when the script is used within a console and not as an import.
-debugging = False
+debugging = False  # ONLY set debugging here.
 debugging_file = 'cleverbot_debug.log'
 console = False
 log = logging.getLogger(__name__)
@@ -105,14 +116,15 @@ class CleverBot:
         self.timeout = 20
 
         # Set CleverBot reply language.
-        # NOTE: Set to English, other country codes can be specified e.g. 'fr' (France).
+        # NOTE: Set to English (en), other country codes can be specified e.g. 'fr' (France).
+        #       Whether this works properly, I am unsure.
         manual_language = 'en'
 
         self.base_url = 'http://www.cleverbot.com/'
         self.full_url = 'http://www.cleverbot.com/webservicemin?uc=255&out=&in=' + \
                         '&bot=&cbsid=&xai=&ns=&al=&dl=&flag=&user=&mode=&alt=&reac=&emo=&sou=&xed=&t='
 
-        # Test the MD5checksum; the "VText" and "sessionid" form data is not asked for on the initial request.
+        # Test the MD5checksum; the 'VText' and 'sessionid form data is not asked for on the initial request.
         self.start_form_data = 'stimulus=&cb_settings_language=&cb_settings_scripting=no&islearning=1' + \
                                '&incognoid=wsf&icognocheck='
 
@@ -148,7 +160,7 @@ class CleverBot:
         :return: str "icognocheck" token to place back into the POST form dictionary.
         """
         # Only characters 10 to 36 should be used to produce the token; as stated by folz/cleverbot.py
-        digest_encoded = payload_data[9:35]
+        digest_encoded = payload_data[9:35].encode('utf-8')
         post_token = hashlib.md5(digest_encoded).hexdigest()
         if debugging and console:
             log.info('Raw authentication sliced-text: %s' % digest_encoded)
@@ -174,16 +186,14 @@ class CleverBot:
         if len(self.output) is not 0:
             post_url = post_url.replace('&out=', '&out=' + str(self.output))
 
-        # NEW: Make sure this number is accurate.
         # Set the number of requests we have made to CleverBot.
         if self.ns is not 0:
             post_url = post_url.replace('&ns=', '&ns=' + str(self.ns))
 
-        # NEW: Implement the time difference between POST requests.
         # Set the time difference between the last POST request sent and this one being prepared.
         if self.time_post is not 0:
             # Calculate the new time difference and place it into the post URL.
-            self.t = int(round(time.time() * 1000)) - self.time_post
+            self.t = int(round(time.time()*1000)) - self.time_post
             post_url = post_url.replace('&t=', '&t=' + str(self.t))
 
         # Set the language to use in the POST url.
@@ -209,7 +219,7 @@ class CleverBot:
         post_url = post_url.replace('&sou=', '&sou=' + str(self.sou))
 
         if debugging and console:
-            log.info('Generated POST URL: %s' % post_url)
+            log.info('Generated POST URL: ' + post_url)
         return post_url
 
     def generate_form_data(self):
@@ -227,7 +237,7 @@ class CleverBot:
         # Place the initial stimulus as the user's input (URL-encoded).
         raw_stimulus = quote_plus(self.input)
 
-        # Handle conversation log, "VText" is the placeholder for this.
+        # Handle conversation log, 'VText' is the placeholder for this.
         if len(self.post_log) is not 0:
             # Generate the reversed POST log.
             reversed_log = list(reversed(self.post_log))
@@ -235,12 +245,12 @@ class CleverBot:
             # Record each entry in the list, we start at 2 since 1 is the request we have recently inputted.
             individual_entry = 2
             for x in range(len(reversed_log)):
-                raw_stimulus += '&vText%s=%s' % (str(individual_entry), reversed_log[x][1])
+                raw_stimulus += '&vText{}={}'.format(str(individual_entry), reversed_log[x][1])
                 individual_entry += 1
-                raw_stimulus += '&vText%s=%s' % (str(individual_entry), reversed_log[x][0])
+                raw_stimulus += '&vText{}={}'.format(str(individual_entry), reversed_log[x][0])
                 individual_entry += 1
 
-        # Handle the "sessionid" data entry.
+        # Handle the 'sessionid' data entry.
         # NOTE: This is not required on the initial POST request. Disabling this allows requests to be sent without
         # replies being in context to the previous inputs, this may give you randomised answers from the server.
         if len(self.post_log) is not 0:
@@ -254,7 +264,7 @@ class CleverBot:
 
         # Handle the authentication token.
         authentication_token = self.client_authentication(normal_form_data)
-        # The post token is we have generated is now the "icognocheck" in the POST data.
+        # The post token is we have generated is now the 'icognocheck' in the POST data.
         normal_form_data = normal_form_data.replace('&icognocheck=', '&icognocheck=' + authentication_token)
 
         # Returns url encoded POST form data.
@@ -265,10 +275,10 @@ class CleverBot:
         # Initialise a connection with CleverBot.
         if debugging and console:
             log.info('--> Connecting to CleverBot.')
-        test_server = self.cleverbot_session.request(method='GET', url=self.base_url,
-                                                     headers=DEFAULT_HEADER, timeout=self.timeout)
+        test_server = self.cleverbot_session.request(method='GET', url=self.base_url, headers=DEFAULT_HEADER,
+                                                     timeout=self.timeout)
 
-        # If we received an "OK" (200) status code, then proceed to begin a conversation.
+        # If we received an 'OK' (200) status code, then proceed to begin a conversation.
         if test_server.status_code is requests.codes.ok:
             if debugging and console:
                 log.info('*Ready to begin conversation.*')
@@ -282,14 +292,15 @@ class CleverBot:
     def converse(self, user_input):
         """
         Takes user's input and maintains a continuous conversation with CleverBot.
-        :param user_input: str the users statement/question to query with CleverBot.
+        :param user_input: str the user's statement/question to query with CleverBot.
         """
         if self.cleverbot_on:
             # Print user's input and log it if necessary.
-            log_user_input = 'You: %s' % user_input
+            log_user_input = 'You: ' + user_input
             if debugging and console:
                 print(log_user_input)
                 log.info(log_user_input)
+
             # URL-encode user input.
             self.input = quote_plus(user_input)
 
@@ -329,7 +340,8 @@ class CleverBot:
                 post_response.raise_for_status()
         else:
             if debugging and console:
-                log.error('Clever-client-bot is unable to reach the CleverBot server.')
+                log.error('Clever-client-Bot is unable to reach the CleverBot server.')
+            print('We cannot reach the CleverBot server at the moment.')
 
 
 def main():
@@ -338,14 +350,15 @@ def main():
     # Initialise CleverBot instance.
     cb_session = CleverBot()
 
-    # Turn on console mode to allow debugging to work, otherwise the instance will function as an import.
+    # Turn on console mode to allow debugging information to be saved to the debug log, otherwise the instance will
+    # function as an import ONLY.
     console = True
 
-    # Start the loop to ask the user for his/her statement/question to send to CleverBot,
-    # and print the response received from the server.
+    # Start the loop to ask the user for his/her statement/question to send to CleverBot and print the response
+    # received from the server.
     while True:
-        usr = raw_input('\nEnter in statement/question: ')
-        response = cb_session.converse(usr)
+        user_input = input_type('\nEnter in statement/question: ')
+        response = cb_session.converse(user_input)
         print('CleverBot response: %s' % response)
 
 if __name__ == '__main__':
@@ -356,9 +369,4 @@ if __name__ == '__main__':
     else:
         log.addHandler(logging.NullHandler())
     main()
-
-# Debugging (token):
-# payload = ''
-# post_token = CleverBot.client_authentication(payload)
-# print(post_token)
 
