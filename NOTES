@@ -1,0 +1,32 @@
+Debug notes:
+-----------
+
+This is an area to store some notes taken when debugging the application.
+Due the nature of this script, I can't personally be sure whether these reflect how the server works,
+however I have taken a guess at how it might work.
+
+• The difference in requests:
+
+    Website: stimulus=Are%20you%20OK%3F&vText2=Czesc.&vText3=Hi.&sessionid=WXDADF3BM3
+    Bot: stimulus=Are%252Byou%252BOK%25253F%26vText2%3DCze%25C5%259B%25C4%2587.%26vText3%3DHi.&sessionid=WXHD9BVD1H
+
+    With same website sessionids:
+        - Bot token: f18dc646e67c52c42075dbdad2067830
+    Therefore, variances in sessionid does not change the outcome of the payload token.
+
+    With same stimulus data from website:
+        - Bot token: f18dc646e67c52c42075dbdad2067830
+    We see that there is still no difference even when having the same stimulus.
+
+    With the same order:
+        Order: stimulus, cb_settings_language, cb_settings_scripting, sessionid, islearning, icognoid & icognocheck
+            - Token: 22d993714e5dba1620050948761c513f
+
+    With same stimulus as well:
+            - Token: 11af21b2970b852fe7790ce0f66e688e
+    Here is a match with the same token.
+
+    Therefore we need to have this same order and also we need to have the stimulus first.
+
+    To put it in a nutshell, whether the response will be accepted by the server is based on the stimulus it
+    receives and parses initially from our request.

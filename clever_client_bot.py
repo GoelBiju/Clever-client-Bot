@@ -30,47 +30,28 @@ else:
     input_type = raw_input
 
 # TODO: Add ChangeLog and include all changes from the previous version.
-# NEW: Added fallback to Python 3.
+# TODO: Edit access to the debugging options.
+# TODO: The quoting on the our requests is still not fully correct.
+
+# NEW: Added fallback to Python 3+.
 # NEW: Small tweaks to avoid string formatting via percentage symbol everywhere, using .format as well.
 # NEW: The unicode object not being encoded before hashing error has been resolved in Python 3+. We know encode the
 #      digest to utf-8 just before hashing and producing the hex-digest.
+# NEW: Session id is now not sent on the first post request.
+# NEW: The row id information is sent along with the first three characters of the 'xai' web-form field in the
+#      in the post url.
+# EDIT: Removed testing payload information and added debugging notes to the NOTES file.
 
-# Debug notes:
-#   - the difference in requests:
-"""
-Website: stimulus=Are%20you%20OK%3F&vText2=Czesc.&vText3=Hi.
-         &sessionid=WXDADF3BM3
-Bot: stimulus=Are%252Byou%252BOK%25253F%26vText2%3DCze%25C5%259B%25C4%2587.%26vText3%3DHi.
-     &sessionid=WXHD9BVD1H
-
-With same website sessionids:
-     Bot token: f18dc646e67c52c42075dbdad2067830
-     Therefore, variances in sessionid does not change the outcome of the payload token.
-
-With same stimulus data from website:
-    Bot token: f18dc646e67c52c42075dbdad2067830
-    We see that there is still no difference even when having the same stimulus.
-
-With the same order:
-    Order: stimulus, cb_settings_language, cb_settings_scripting, sessionid, islearning, icognoid & icognocheck
-    Token: 22d993714e5dba1620050948761c513f
-
-    With same stimulus as well:
-        Token: 11af21b2970b852fe7790ce0f66e688e
-        Here is a match with the same token.
-
-    Therefore we need to have this same order and also we need to have the stimulus first.
-
-    To put it in a nutshell, whether the response will be accepted by the server is based on the stimulus it
-    receives and parses initially from our request.
-"""
-
-__version__ = '1.1.1'
+__version__ = '1.1.2'
 
 # NOTE: Debugging only works when the script is used within a console and not as an import.
 debugging = False  # ONLY set debugging here.
 debugging_file = 'cleverbot_debug.log'
+
+# Modifying this variable here will not change if the application
+# will work in the console or not.
 console = False
+
 log = logging.getLogger(__name__)
 
 DEFAULT_HEADER = {
@@ -88,7 +69,7 @@ DEFAULT_HEADER = {
 
 
 class CleverBot:
-    """ Main instance of CleverBot. """
+    """ Main instance of the CleverBot client. """
 
     def __init__(self):
         """
@@ -102,10 +83,11 @@ class CleverBot:
         # To manually enable/disable any further conversations with (requests to) CleverBot.
         self.cleverbot_on = True
 
-        # Our CleverBot HTTP session.
+        # Create a new requests session to act as the CleverBot conversation.
         self.cleverbot_session = requests.Session()
+
         if debugging and console:
-            log.info('--> Initiated CleverBot HTTP Session.')
+            log.info('--> Initiated CleverBot Session.')
 
         # Keep a list of the number of POST requests we make, along with the conversation
         # details which were made to it.
@@ -124,15 +106,39 @@ class CleverBot:
         self.full_url = 'http://www.cleverbot.com/webservicemin?uc=255&out=&in=' + \
                         '&bot=&cbsid=&xai=&ns=&al=&dl=&flag=&user=&mode=&alt=&reac=&emo=&sou=&xed=&t='
 
+        # TODO: '&sessionid' is missing from the form data.
         # Test the MD5checksum; the 'VText' and 'sessionid form data is not asked for on the initial request.
-        self.start_form_data = 'stimulus=&cb_settings_language=&cb_settings_scripting=no&islearning=1' + \
+        self.start_form_data = 'stimulus=&cb_settings_language=&cb_settings_scripting=no&sessionid=&islearning=1' + \
                                '&incognoid=wsf&icognocheck='
 
-        # The essential WebForms query variables.
+        # The essential WebForms query variables:
+
+        # The specifics of what these web-form queries may contain is found on line no. 22727 in
+        # the 'conversation-social-min.js' file:
+        #   - out: encodeURIComponent(c),
+        #   - "in": encodeURIComponent(b),
+        #   - bot: (e == "chimbot") ? "h" : e.substring(0, 1),
+        #   - cbsid: cleverbot.sessionid ? cleverbot.sessionid : "MYSESSIONID",
+        #   - xai: cleverbot.getCookieValue("XAI") + (cleverbot.rowidandref ? ("," + cleverbot.rowidandref) : ""),
+        #   - ns: parseInt(cleverbot.numsessioninputs) + 1,
+        #   - al: cleverbot.asrlanguage,
+        #   - dl: cleverbot.detectedlanguage,
+        #   - flag: a,
+        #   - user: (cleverbot.hassocial && socialAction && socialAction.getUserName ? socialAction.getUserName() : ""),
+        #   - mode: cleverbot.mode,
+        #   - alt: cleverbot.numalternates > 0 ? cleverbot.usingalternate : 0,
+        #   - reac: cleverbot.reaction,
+        #   - emo: cleverbot.emotion,
+        #   - sou: cleverbot.source,
+        #   - xed: cleverbot.extradata
+
         self.output = ''
         self.input = ''
         self.bot = 'c'
         self.conversation_id = None
+        # TODO: Xai web-form now sends more information as opposed to the three letter field;
+        #       e.g. previously: 'WXC', currently: 'WXC,127450838,L020843766'
+        #       The extra parameter is from the response body in the first request.
         self.xai = ''
         self.ns = 0
         self.al = ''
@@ -147,6 +153,9 @@ class CleverBot:
         self.xed = ''
         self.t = None
 
+        # Extra information.
+        self.row_id = None
+
         # Initiate connection.
         self.connect()
 
@@ -156,11 +165,14 @@ class CleverBot:
         Authenticate our connection by generating the necessary token.
         NOTE: Thanks to the original source code from https://github.com/folz/cleverbot.py/
               to work out how the md5checksum was generated from the POST data.
+              The particular way to encode the data to md5 can be found in the 'conversation-social-min.js'
+              JavaScript file on their website.
+
         :param payload_data: str the POST stimulus data.
         :return: str "icognocheck" token to place back into the POST form dictionary.
         """
         # Only characters 10 to 36 should be used to produce the token; as stated by folz/cleverbot.py
-        digest_encoded = payload_data[9:35].encode('utf-8')
+        digest_encoded = payload_data[9:35].encode('utf-8')  # Referenced on line no. 22826 in JavaScript.
         post_token = hashlib.md5(digest_encoded).hexdigest()
         if debugging and console:
             log.info('Raw authentication sliced-text: %s' % digest_encoded)
@@ -204,7 +216,10 @@ class CleverBot:
             post_url = post_url.replace('&cbsid=', '&cbsid=' + str(self.conversation_id))
 
         # Set the conversation code.
-        post_url = post_url.replace('&xai=', '&xai=' + str(self.xai))
+        if self.row_id is not None:
+            post_url = post_url.replace('&xai=', '&xai=' + str(self.xai) + ',' + self.row_id)
+        else:
+            post_url = post_url.replace('&xai=', '&xai=' + str(self.xai))
 
         # Set the bot.
         post_url = post_url.replace('&bot=', '&bot=' + str(self.bot))
@@ -219,7 +234,8 @@ class CleverBot:
         post_url = post_url.replace('&sou=', '&sou=' + str(self.sou))
 
         if debugging and console:
-            log.info('Generated POST URL: ' + post_url)
+            log.info('Generated Post URL: ' + post_url)
+
         return post_url
 
     def generate_form_data(self):
@@ -237,6 +253,8 @@ class CleverBot:
         # Place the initial stimulus as the user's input (URL-encoded).
         raw_stimulus = quote_plus(self.input)
 
+        # TODO: We only need to send back what we receive from the parsed body, we don't have to keep a record of this.
+        #       Try to implement a way in which we can just reverse this, however by using the response body.
         # Handle conversation log, 'VText' is the placeholder for this.
         if len(self.post_log) is not 0:
             # Generate the reversed POST log.
@@ -250,11 +268,15 @@ class CleverBot:
                 raw_stimulus += '&vText{}={}'.format(str(individual_entry), reversed_log[x][0])
                 individual_entry += 1
 
+        # TODO: This is not being sent on any of the original post requests; this should be sent after the first
+        #       and all future requests (we should not have the '&sessionid' in the first request).
         # Handle the 'sessionid' data entry.
         # NOTE: This is not required on the initial POST request. Disabling this allows requests to be sent without
-        # replies being in context to the previous inputs, this may give you randomised answers from the server.
+        # replies being in context to the previous inputs, this may give you random outputs from the server.
         if len(self.post_log) is not 0:
             normal_form_data = normal_form_data.replace('&sessionid=', '&sessionid=' + self.conversation_id)
+        else:
+            normal_form_data = normal_form_data.replace('&sessionid=', '')
 
         # Set the language.
         normal_form_data = normal_form_data.replace('&cb_settings_language=', '&cb_settings_language=' + self.dl)
@@ -267,8 +289,33 @@ class CleverBot:
         # The post token is we have generated is now the 'icognocheck' in the POST data.
         normal_form_data = normal_form_data.replace('&icognocheck=', '&icognocheck=' + authentication_token)
 
+        if debugging and console:
+            log.info('Generated Form Data: ' + normal_form_data)
+
         # Returns url encoded POST form data.
         return normal_form_data
+
+    # TODO: Develop a method to parse the response body for the output, conversation id,
+    #       a set of alphanumeric characters which is to be sent with the 'xai' field - we can also confirm the
+    #       'xai' field with the one received in the header response cookie and the one received in the body.
+    def parse_response_body(self, response_content):
+        """
+        A method to parse the response body sent from each CleverBot POST request.
+
+        :param response_content: bytes the response content from the requests response object.
+        :return: response_body dict{'text_response', 'conversation_id', 'row_id', 'raw_response'} or None
+                 if we could not decode the body.
+        """
+        response_list = response_content.split('\r')
+        # print(response_list)
+        response_body = {
+            'latest_reply': response_list[0],
+            'conversation_id': response_list[1],
+            'row_id': response_list[2],
+            'latest_posts': response_list[3:10],
+        }
+
+        return response_body
 
     def connect(self):
         """ Establish that a connection can be made with the server. """
@@ -289,6 +336,7 @@ class CleverBot:
                 log.error('*Server did not respond with an \'OK\' (status code %s)*' % test_server.status_code)
             self.cleverbot_on = False
 
+    # TODO: The data being sent should really be cleared out, rather than piling it.
     def converse(self, user_input):
         """
         Takes user's input and maintains a continuous conversation with CleverBot.
@@ -297,6 +345,7 @@ class CleverBot:
         if self.cleverbot_on:
             # Print user's input and log it if necessary.
             log_user_input = 'You: ' + user_input
+
             if debugging and console:
                 print(log_user_input)
                 log.info(log_user_input)
@@ -304,9 +353,16 @@ class CleverBot:
             # URL-encode user input.
             self.input = quote_plus(user_input)
 
+            # Increment the number of posts; the number we will
+            # end up sending after the request has been sent.
+            self.ns += 1
+
             # Generate both the form data and the POST URL.
             post_data = self.generate_form_data()
             post_url = self.generate_post_url()
+
+            # print('POST Data:', post_data)
+            # print('POST URL:', post_url)
 
             # Send the POST request.
             post_response = self.cleverbot_session.request(method='POST', url=post_url, data=post_data,
@@ -316,14 +372,17 @@ class CleverBot:
             self.time_post = int(round(time.time() * 1000))
 
             if post_response.status_code is requests.codes.ok:
-                # Make sure we parse/decode the response we received properly and return it to the user.
-                self.conversation_id = post_response.headers['cbconvid']
+                # Make sure we parse/decode the response we received properly and return it to the user:
+
+                # Retrieve the current conversation id from the cookie header.
+                self.conversation_id = post_response.headers['CBCONVID']
+
+                # Retrieve and search for the 'xai' field data from the response headers cookie.
                 set_cookie = post_response.headers['set-cookie']
                 self.xai = re.search('XAI=(.+?);', set_cookie).group(1)
-                self.output = post_response.headers['cboutput']
 
-                # Increment the response count.
-                self.ns += 1
+                # Retrieve the output from the cookie header.
+                self.output = post_response.headers['CBOUTPUT']
 
                 # Add conversation to the log list.
                 self.post_log.append([self.input, self.output])
@@ -332,15 +391,33 @@ class CleverBot:
                 response = unquote(self.output)
                 if debugging and console:
                     log.info(response)
-                return response
+
+                response = self.parse_response_body(post_response.content)
+
+                # Set the row id for the next response from this post response's body.
+                self.row_id = response['row_id']
+
+                # TODO: We could maybe check responses from both the response body and the header 'CBOUTPUT'
+                #       (which is saved into self.output) cookie.
+                # if self.output == response['latest_reply']:
+                #     return response['latest_reply']
+                # else:
+                #     if debugging and console:
+                #         log.warning('The output received in the header cookie does not '
+                #                     'match the output in the response body.')
+
+                return response['latest_reply']
             else:
                 if debugging and console:
                     log.warning('An error may have occured in the POST request.')
                     log.error(post_response.headers)
+
+                # Raise a requests status code error.
                 post_response.raise_for_status()
         else:
             if debugging and console:
                 log.error('Clever-client-Bot is unable to reach the CleverBot server.')
+
             print('We cannot reach the CleverBot server at the moment.')
 
 
@@ -350,8 +427,8 @@ def main():
     # Initialise CleverBot instance.
     cb_session = CleverBot()
 
-    # Turn on console mode to allow debugging information to be saved to the debug log, otherwise the instance will
-    # function as an import ONLY.
+    # Turn on console mode to allow debugging information to be saved to the debug log,
+    # otherwise the instance will function as an import ONLY.
     console = True
 
     # Start the loop to ask the user for his/her statement/question to send to CleverBot and print the response
@@ -369,4 +446,3 @@ if __name__ == '__main__':
     else:
         log.addHandler(logging.NullHandler())
     main()
-
