@@ -15,7 +15,7 @@ This module has been developed as a more cut down and easy-to-use version of the
 The following is an example to how the module can be used:
 ```python
 Editor:
--------
+
 # Import the Clever-client-Bot module.
 import clever_client_bot
 
@@ -33,7 +33,7 @@ response = cleverbot.converse(query)
 print(response)
 
 Console:
---------
+
 >>> "Actually very good. I had a softball all-stars tournament and we won. I am so happy. We had pizza after the game by the way."  
 ```
 
