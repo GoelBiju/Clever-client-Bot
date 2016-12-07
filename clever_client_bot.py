@@ -42,7 +42,7 @@ else:
 #      in the post url.
 # EDIT: Removed testing payload information and added debugging notes to the NOTES file.
 
-__version__ = '1.1.2'
+__version__ = '1.1.3'
 
 # NOTE: Debugging only works when the script is used within a console and not as an import.
 debugging = False  # ONLY set debugging here.
@@ -298,7 +298,8 @@ class CleverBot:
     # TODO: Develop a method to parse the response body for the output, conversation id,
     #       a set of alphanumeric characters which is to be sent with the 'xai' field - we can also confirm the
     #       'xai' field with the one received in the header response cookie and the one received in the body.
-    def parse_response_body(self, response_content):
+    @staticmethod
+    def parse_response_body(response_content):
         """
         A method to parse the response body sent from each CleverBot POST request.
 
@@ -306,8 +307,10 @@ class CleverBot:
         :return: response_body dict{'text_response', 'conversation_id', 'row_id', 'raw_response'} or None
                  if we could not decode the body.
         """
-        response_list = response_content.split('\r')
-        # print(response_list)
+        # TODO: Added bytes decoding in order to support parsing the response in Python 3+.
+        response_data = response_content.decode(encoding='utf-8')
+        response_list = response_data.split('\r')
+
         response_body = {
             'latest_reply': response_list[0],
             'conversation_id': response_list[1],

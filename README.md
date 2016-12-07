@@ -2,7 +2,7 @@
 
 ---
 
-### Version: 1.1.2
+### Version: 1.1.3
 
 
 ### *Overview*
@@ -36,8 +36,6 @@ Console:
 
 >>> "Actually very good. I had a softball all-stars tournament and we won. I am so happy. We had pizza after the game by the way."  
 ```
-
-A potential response from the server could be:
 
 
 
