@@ -42,7 +42,7 @@ else:
 #      in the post url.
 # EDIT: Removed testing payload information and added debugging notes to the NOTES file.
 
-__version__ = '1.1.3'
+__version__ = '1.1.4'
 
 # NOTE: Debugging only works when the script is used within a console and not as an import.
 debugging = False  # ONLY set debugging here.
@@ -53,6 +53,8 @@ debugging_file = 'cleverbot_debug.log'
 console = False
 
 log = logging.getLogger(__name__)
+
+BOT_API_TAG = 'clever_client_bot'
 
 DEFAULT_HEADER = {
     'Host': 'www.cleverbot.com',
@@ -79,7 +81,6 @@ class CleverBot:
               to conform with most encodings whereas using a string or string conversion may
               result in encoding/decoding errors.
         """
-
         # To manually enable/disable any further conversations with (requests to) CleverBot.
         self.cleverbot_on = True
 
@@ -97,14 +98,18 @@ class CleverBot:
         self.time_post = 0
         self.timeout = 20
 
+        # Set the version of the webservice(?)
+        self.bot_api = BOT_API_TAG
+        webservice_version = '3210'
+
         # Set CleverBot reply language.
         # NOTE: Set to English (en), other country codes can be specified e.g. 'fr' (France).
         #       Whether this works properly, I am unsure.
         manual_language = 'en'
 
         self.base_url = 'http://www.cleverbot.com/'
-        self.full_url = 'http://www.cleverbot.com/webservicemin?uc=255&out=&in=' + \
-                        '&bot=&cbsid=&xai=&ns=&al=&dl=&flag=&user=&mode=&alt=&reac=&emo=&sou=&xed=&t='
+        self.full_url = 'http://www.cleverbot.com/webservicemin?uc={0}&botapi={1}&out=&in=&bot=&cbsid=&xai=&ns=&al=' \
+                        '&dl=&flag=&user=&mode=&alt=&reac=&emo=&sou=&xed=&t='.format(webservice_version, self.bot_api)
 
         # TODO: '&sessionid' is missing from the form data.
         # Test the MD5checksum; the 'VText' and 'sessionid form data is not asked for on the initial request.
@@ -112,7 +117,6 @@ class CleverBot:
                                '&incognoid=wsf&icognocheck='
 
         # The essential WebForms query variables:
-
         # The specifics of what these web-form queries may contain is found on line no. 22727 in
         # the 'conversation-social-min.js' file:
         #   - out: encodeURIComponent(c),
