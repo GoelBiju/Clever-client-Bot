@@ -12,7 +12,7 @@ Their funding comes from revenue from their website and I encourage **everyone**
 
 If in the situation that you wll need to use a package, this package is to be used with the **bot-api** name:
 
-					    															'clever_client_bot'
+													'clever_client_bot'
 
 Please support their work and view their official notice for further information:
 
