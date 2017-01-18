@@ -6,17 +6,17 @@
 
 ### NOTICE:
 
-The developers of the CleverBot service/website work hard to provide this service for free. This should not really be used in this way, as I am doing and it is damaging their ability to work further on the CleverBot project. 
+The developers of the CleverBot service/website work hard to provide this service for free. This should not really be used in this way as I am doing, and it is damaging their ability to work further on the CleverBot project.
 
 Their funding comes from revenue from their website and I encourage **everyone** to use the service via the website.
 
 If in the situation that you wll need to use a package, this package is to be used with the **bot-api** name:
 
-					    'clever_client_bot'
+					    															'clever_client_bot'
 
 Please support their work and view their official notice for further information:
 
-**Sign up for ** [Cleverscript](http://www.cleverscript.com/) if you want to  use their service on a large scale and to help support their development.
+**Pleae sign up for** [Cleverscript](http://www.cleverscript.com/) if you want to  use their service on a large scale and to help support their development.
 
 
 ### *Overview*
@@ -29,7 +29,6 @@ This module has been developed as a more cut down and easy-to-use version of the
 The following is an example to how the module can be used:
 ```python
 Editor:
--------
 # Import the Clever-client-Bot module.
 import clever_client_bot
 
@@ -46,14 +45,6 @@ response = cleverbot.converse(query)
 # Now you can use the response in any way you want.
 print(response)
 
-Console:
---------
+Console
 >>> "Actually very good. I had a softball all-stars tournament and we won. I am so happy. We had pizza after the game by the way."  
 ```
-
-A potential response from the server could be:
-
-
-
-### *Help-wanted*
-I would appreciate any assistance with this small module to develop it and maintain it. This might mean posting any relevent issues in the issues section here on GitHub or maybe posting a pull request to place something in new or patch something which doesn't work in the module.
