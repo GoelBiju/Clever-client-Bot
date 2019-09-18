@@ -1,4 +1,4 @@
-# Clever-client-Bot
+# Deprecated: CleverBot-Example
 
 ---
 
@@ -6,18 +6,9 @@
 
 ### NOTICE:
 
-The developers of the CleverBot service/website work hard to provide this service for free. This should not really be used in this way as I am doing, and it is damaging their ability to work further on the CleverBot project.
+This was just an example of how to communicate with the CleverBot website previous to the API becoming popular.
 
-Their funding comes from revenue from their website and I encourage **everyone** to use the service via the website.
-
-If in the situation that you wll need to use a package, this package is to be used with the **bot-api** name:
-
-													'clever_client_bot'
-
-Please support their work and view their official notice for further information:
-
-**Pleae sign up for** [Cleverscript](http://www.cleverscript.com/) if you want to  use their service on a large scale and to help support their development.
-
+**Please sign up for** [Cleverscript](http://www.cleverscript.com/) to use the CleverBot service on a large scale.
 
 ### *Overview*
 Clever-client-Bot is a reboot of the original Cleverbot client developed by initially by [Rodney Folz](https://github.com/folz/) - [Cleverbot.py](http://github.com/folz/cleverbot.py).
